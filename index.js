@@ -11,7 +11,7 @@ const client = new Client({
 // --- GLOBAL SYSTEMS ---
 let baddieMood = 'fabulous'; 
 const userReputation = {};
-const userBank = {}; // NEW: Safe place for Rep
+const userBank = {}; 
 const userInventory = {}; 
 const userBio = {}; 
 const lastDaily = {}; 
@@ -20,7 +20,6 @@ const userLevel = {};
 const lastWork = {}; 
 const userPets = {}; 
 const petLevel = {}; 
-const lastFeed = {}; 
 const userPartner = {}; 
 const userJob = {}; 
 const lastRob = {}; 
@@ -41,8 +40,9 @@ const shopItems = {
   "wedding-ring": { cost: 2000, description: "To secure the bag... I mean, love. 💍💖" }
 };
 
-client.on('ready', () => {
-  console.log(`${client.user.tag} is officially in the building! 💅🏻✨`);
+// FIXED: Changed 'ready' to 'clientReady' to stop the crash/warning 🚨
+client.once('clientReady', (c) => {
+  console.log(`${c.user.tag} is officially in the building! 💅🏻✨`);
   setInterval(() => {
     const moods = ['fabulous', 'sassy', 'expensive', 'unbothered', 'judgemental'];
     baddieMood = moods[Math.floor(Math.random() * moods.length)];
@@ -50,12 +50,12 @@ client.on('ready', () => {
 });
 
 client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
+  if (message.author.bot || !message.guild) return;
 
   const content = message.content.toLowerCase();
   const userId = message.author.id;
 
-  // --- INITIALIZE DATA ---
+  // --- INITIALIZE DATA (Safety First! 🖇️) ---
   if (!userReputation[userId]) userReputation[userId] = 0;
   if (!userBank[userId]) userBank[userId] = 0;
   if (!userInventory[userId]) userInventory[userId] = [];
@@ -124,7 +124,7 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  else if (content.startsWith('$dep ')) { // NEW: Deposit to Bank
+  else if (content.startsWith('$dep ')) {
     const amount = parseInt(content.split(' ')[1]);
     if (isNaN(amount) || amount <= 0 || amount > userReputation[userId]) return message.reply("Enter a valid amount to hide! 🖇️👀");
     userReputation[userId] -= amount;
@@ -149,7 +149,7 @@ client.on('messageCreate', async (message) => {
     return message.reply({ embeds: [profileEmbed] });
   }
 
-  else if (content.startsWith('$give ')) { // NEW: Give Rep to friend
+  else if (content.startsWith('$give ')) {
     const target = message.mentions.users.first();
     const amount = parseInt(content.split(' ')[2]);
     if (!target || isNaN(amount) || amount <= 0 || amount > userReputation[userId]) return message.reply("Check your wallet and try again, bestie. 🖇️🌚");
