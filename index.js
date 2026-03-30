@@ -1,10 +1,4 @@
-const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
-const client = new Client({ 
-  intents: [
-    GatewayIntentBits.Guilds, 
-    GatewayIntentBits.GuildMessages, 
-    GatewayIntentBits.MessageContent 
-  ],
+],
   partials: [Partials.Channel]
 });
 
@@ -239,3 +233,211 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
+const client = new Client({ 
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  partials: [Partials.Channel]
+});
+
+// --- DATABASE SYSTEMS ---
+const userReputation = {}; 
+const userBank = {}; 
+const userInventory = {}; 
+const lastDaily = {}; 
+const dailyStreak = {}; // NEW: Streak system
+const lastWork = {}; 
+const userJob = {}; 
+const userPartner = {}; 
+const activeProposals = {}; 
+const lastTea = {};
+const userBio = {};
+
+// --- CONFIGURATIONS ---
+const jobs = {
+  "Intern 🗑️": { req: 0, pay: 15 },
+  "Stylist 💅": { req: 100, pay: 50 },
+  "Influencer 📸": { req: 300, pay: 100 },
+  "Model 👠": { req: 600, pay: 200 },
+  "CEO of Sass 💍": { req: 1200, pay: 500 }
+};
+
+const extendedShop = {
+  "sparkles": { cost: 100, emoji: "✨", desc: "Add some glitz to your profile." },
+  "coffee": { cost: 50, emoji: "☕", desc: "Stay awake during meetings." },
+  "heels": { cost: 500, emoji: "👠", desc: "Step on the haters." },
+  "gucci-bag": { cost: 1500, emoji: "🛍️", desc: "Carry your tea in style." },
+  "rolex": { cost: 3000, emoji: "💎", desc: "Time is money, honey." },
+  "crown": { cost: 10000, emoji: "👑", desc: "The ultimate baddie flex." },
+  "wedding-ring": { cost: 5000, emoji: "💍", desc: "To secure the bag... and love." }
+};
+
+// --- CLIENT READY ---
+client.on('ready', () => {
+  console.log(`${client.user.tag} is in the building and looking expensive! 💅✨`);
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  const content = message.content.toLowerCase();
+  const userId = message.author.id;
+  const target = message.mentions.users.first();
+
+  // --- DATA INITIALIZATION ---
+  if (!userReputation[userId]) userReputation[userId] = 0;
+  if (!userBank[userId]) userBank[userId] = 0;
+  if (!userInventory[userId]) userInventory[userId] = [];
+  if (!userJob[userId]) userJob[userId] = "Intern 🗑️";
+  if (!activeProposals[userId]) activeProposals[userId] = [];
+  if (!dailyStreak[userId]) dailyStreak[userId] = 0;
+  if (!userBio[userId]) userBio[userId] = "Just a basic human. 🙄";
+
+  // --- 1. THE BIG SOCIAL SYSTEM ($CMD @USER) ---
+  const socialActions = {
+    '$wink': `😉 **${message.author.username}** winks at **{t}**. Looking good! ✨`,
+    '$stare': `🤨 **${message.author.username}** is staring at **{t}**... Awkward. 💅`,
+    '$poke': `👉 **${message.author.username}** pokes **{t}**. Hello? 🙄`,
+    '$hug': `🛍️ **${message.author.username}** gives **{t}** a warm hug! Watch the hair! ✨`,
+    '$kiss': `💋 **${message.author.username}** kisses **{t}**! How iconic! ❤️`,
+    '$kick': `👠 **${message.author.username}** kicks **{t}**! Get out of here! 🗑️`,
+    '$slap': `🧤 **${message.author.username}** slaps **{t}**! The audacity! 🤨`,
+    '$cuddle': `💖 **${message.author.username}** cuddles with **{t}**. Too cute! ✨`,
+    '$pat': `🖐️ **${message.author.username}** pats **{t}** on the head. Good local. 💅`,
+    '$glare': `🤨 **${message.author.username}** is glaring at **{t}**. Someone's mad! 🤫`,
+    '$holdhand': `🤝 **${message.author.username}** holds **{t}**'s hand. Expensive energy! 💍`,
+    '$wave': `👋 **${message.author.username}** waves at **{t}** from the VIP lounge. 💅`
+  };
+
+  const command = content.split(' ')[0];
+  if (socialActions[command]) {
+    if (!target) return message.reply("Mention someone to interact with! 💅");
+    const response = socialActions[command].replace('{t}', target.username);
+    return message.channel.send(response);
+  }
+
+  // --- 2. LUXURY SHOP & INVENTORY ---
+  if (content === '$shop') {
+    let shopEmbed = "🛍️ **BADDIE'S LUXURY BOUTIQUE** 🛍️\n\n";
+    for (const [name, info] of Object.entries(extendedShop)) {
+      shopEmbed += `**${name}** ${info.emoji} — ${info.cost} Rep\n*${info.desc}*\n\n`;
+    }
+    return message.reply(shopEmbed + "Type `$buy [item]` to upgrade your life. 💎");
+  }
+
+  if (content.startsWith('$buy ')) {
+    const itemName = content.split(' ')[1];
+    const item = extendedShop[itemName];
+    if (!item) return message.reply("We don't sell basic stuff like that. 🙄");
+    if (userReputation[userId] < item.cost) return message.reply("Your wallet is looking a bit thin. 🤢");
+
+    userReputation[userId] -= item.cost;
+    userInventory[userId].push(item.emoji);
+    return message.reply(`You bought the **${itemName}** ${item.emoji}! You're glowing. ✨`);
+  }
+
+  if (content === '$inventory') {
+    const items = userInventory[userId].length > 0 ? userInventory[userId].join(' ') : "Nothing yet. 🗑️";
+    return message.reply(`**Your Luxury Collection:**\n${items}`);
+  }
+
+  // --- 3. STREAK-BASED DAILY SYSTEM ---
+  if (content === '$daily') {
+    const now = Date.now();
+    const cooldown = 86400000;
+    const last = lastDaily[userId] || 0;
+
+    if (now - last < cooldown) {
+      const timeLeft = cooldown - (now - last);
+      const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+      const mins = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      return message.reply(`Patience! 🙄 Next daily in **${hours}h ${mins}m**. 🤫`);
+    }
+
+    if (now - last < cooldown * 2) {
+      dailyStreak[userId]++;
+    } else {
+      dailyStreak[userId] = 1;
+    }
+
+    const bonus = dailyStreak[userId] * 10;
+    userReputation[userId] += (50 + bonus);
+    lastDaily[userId] = now;
+    return message.reply(`Daily 50 Rep + **${bonus} Streak Bonus** added! Streak: **${dailyStreak[userId]}** days. 🛍️✨`);
+  }
+
+  // --- 4. BANKING & BALANCE ---
+  if (content.startsWith('$dep ')) {
+    const amount = parseInt(content.split(' ')[1]);
+    if (isNaN(amount) || amount > userReputation[userId]) return message.reply("Invalid amount, sweetie. 🙄");
+    userReputation[userId] -= amount;
+    userBank[userId] += amount;
+    return message.reply(`Deposited **${amount} Rep**. Safe and sound! 🏦`);
+  }
+
+  if (content.startsWith('$with ')) {
+    const amount = parseInt(content.split(' ')[1]);
+    if (isNaN(amount) || amount > userBank[userId]) return message.reply("Your bank account said 'No'. 🤢");
+    userBank[userId] -= amount;
+    userReputation[userId] += amount;
+    return message.reply(`Withdrew **${amount} Rep**. Go spend it! 🛍️`);
+  }
+
+  if (content === '$bal') {
+    return message.reply(`**Pocket:** ${userReputation[userId]} 💸\n**Bank Vault:** ${userBank[userId]} 🏦`);
+  }
+
+  // --- 5. WORK & CAREERS ---
+  if (content === '$jobs') {
+    let jList = "💼 **AVAILABLE CAREERS** 💼\n\n";
+    for (const [name, info] of Object.entries(jobs)) {
+      jList += `**${name}**\nReq: ${info.req} Rep | Pay: ${info.pay} Rep\n\n`;
+    }
+    return message.reply(jList + "Use `$apply [job]` to move up! 💅");
+  }
+
+  if (content.startsWith('$apply ')) {
+    const jobName = message.content.substring(7).trim();
+    const jobKey = Object.keys(jobs).find(j => j.toLowerCase().includes(jobName.toLowerCase()));
+    if (!jobKey) return message.reply("That's not a real career path. 🙄");
+    if (userReputation[userId] < jobs[jobKey].req) return message.reply("You aren't iconic enough for this yet. 🤢");
+    userJob[userId] = jobKey;
+    return message.reply(`Congrats! You are now a **${jobKey}**. 💼✨`);
+  }
+
+  if (content === '$work') {
+    const now = Date.now();
+    if (now - (lastWork[userId] || 0) < 3600000) return message.reply("Take a 1 hour break. 😴");
+    const pay = jobs[userJob[userId]].pay;
+    userReputation[userId] += pay;
+    lastWork[userId] = now;
+    return message.reply(`Worked as a **${userJob[userId]}** and earned **${pay} Rep**. 🤑💅`);
+  }
+
+  // --- 6. PROPOSALS & MARRIAGE ---
+  if (content === '$proposals') {
+    const list = activeProposals[userId] || [];
+    if (list.length === 0) return message.reply("No one is begging for your attention. 🙄");
+    const msg = "💍 **YOUR PROPOSALS** 💍\n" + list.map((id, i) => `${i + 1}. <@${id}>`).join('\n');
+    return message.reply(msg + "\nType `$accept [number]`! 💖");
+  }
+
+  if (content.startsWith('$marry')) {
+    if (!target || target.id === userId) return message.reply("Mention someone else! 💅");
+    if (!userInventory[userId].includes('💍')) return message.reply("You need a `wedding-ring` from the shop! 💍");
+    activeProposals[target.id] = activeProposals[target.id] || [];
+    activeProposals[target.id].push(userId);
+    return message.reply(`Proposal sent to ${target.username}! 💎`);
+  }
+
+  if (content.startsWith('$accept ')) {
+    const index = parseInt(content.split(' ')[1]) - 1;
+    const list = activeProposals[userId];
+    if (!list || !list[index]) return message.reply("Invalid proposal number. 🙄");
+    userPartner[userId] = list[index];
+    userPartner[list[index]] = userId;
+    activeProposals[userId] = [];
+    return message.channel.send(`🎉 Married! We love a power couple. 💍💖✨`);
+  }
+});
+
+client.login("YOUR_TOKEN_HERE");
